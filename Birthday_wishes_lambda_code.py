@@ -7,6 +7,8 @@ import boto3
 import json
 import os
 
+event_dict = None
+
 def get_secret(secret_name, region_name):
     # Create a Secrets Manager client
     client = boto3.client('secretsmanager', region_name=region_name)
@@ -23,7 +25,7 @@ def get_secret(secret_name, region_name):
             # If the secret is binary
             secret = response['SecretBinary']
             return secret
-    except ClientError as e:
+    except Exception as e:
         # Handle errors
         if e.response['Error']['Code'] == 'DecryptionFailureException':
             print("Secrets Manager can't decrypt the protected secret text using the provided KMS key.")
@@ -52,7 +54,9 @@ def send_birthday_email(name, email):
     region_name = "us-east-1"
     secret = get_secret(secret_name, region_name)
     
+    
     if secret:
+        print("Getting password")
         # Access the specific password key if your secret is a JSON object
         password = secret.get('vinayvishwa3275@outlook.com')
         
@@ -88,10 +92,10 @@ def main():
     # Set up S3 client
     s3 = boto3.client('s3')
 
-    # Extract the bucket name, folder, and file name from the event or define them here
-    bucket_name = event.get('bucket_name', 'myaws-test-bucket-vinay')
-    s3_folder = event.get('s3_folder', '')  # Leave empty if file is in the root
-    file_name = event.get('file_name', 'birthdays.xlsx')
+    # Extract the bucket name, folder, and file name from the event_dict or define them here
+    bucket_name = event_dict.get('bucket_name', 'myaws-test-bucket-vinay')
+    s3_folder = event_dict.get('s3_folder', '')  # Leave empty if file is in the root
+    file_name = event_dict.get('file_name', 'birthdays.xlsx')
     
     # Set the download path in the /tmp/ directory of Lambda
     download_path = f"/tmp/{file_name}"
@@ -116,15 +120,16 @@ def main():
 
     for index, row in df.iterrows():
        dob = row['Date of Birth'].strftime('%m-%d')
-    if dob == today:
+       if dob == today:
             send_birthday_email(row['Name'], row['Email'])
 
 def lambda_handler(event, context):
-
-    print("Event :",event)
+    global event_dict
+    event_dict = {"bucket_name" : "myaws-test-bucket-vinay","s3_folder": '',"file_name": 'birthdays.xlsx'}
+    print("event_dict :",event_dict)
     main()
 
     return {
         'statusCode': 200,
-        'body': f"File downloaded successfully to {download_path}"
+        'body': f"File downloaded successfully"
     }
